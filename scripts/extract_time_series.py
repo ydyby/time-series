@@ -312,14 +312,25 @@ def compute_time_series(
                 value = float(means[band_indices[band]])
                 band_series[band][sample.label].append(value)
 
+    if sg_window and sg_order is not None and sg_window > 2:
+        if sg_window % 2 == 0:
+            sg_window += 1  # enforce odd window for Savitzky-Golay
+        if sg_window > len(tifs) or not 0 <= sg_order < sg_window:
+            logging.warning(
+                "Skipping smoothing: window length %d must not exceed %d scenes "
+                "and polynomial order %d must satisfy 0 <= order < window.",
+                sg_window,
+                len(tifs),
+                sg_order,
+            )
+            sg_window = None
+
     index = pd.to_datetime([tif.date for tif in tifs])
     smoothed_frames: Dict[str, pd.DataFrame] = {}
     for band in bands_to_use:
         data = {label: np.array(values, dtype=float) for label, values in band_series[band].items()}
         df = pd.DataFrame(data, index=index).sort_index()
         if sg_window and sg_order is not None and sg_window > 2:
-            if sg_window % 2 == 0:
-                sg_window += 1  # enforce odd window for Savitzky-Golay
             for column in df.columns:
                 series = df[column].to_numpy()
                 if np.count_nonzero(~np.isnan(series)) < sg_order + 2:
@@ -523,4 +534,5 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
 if __name__ == "__main__":
     main()
+
 
